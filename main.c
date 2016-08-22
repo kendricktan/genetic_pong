@@ -23,7 +23,7 @@ bool update_screen = true;
 bool TRAIN_AI = false;
 
 GameStates gameState = {1,0,10,0,0,0};
- 
+
 // PADDLE LOCATION
 int PADDLE_HEIGHT;
 int LEFT_PADDLE_Y;
@@ -33,6 +33,15 @@ int RIGHT_PADDLE_X;
 
 // SPRITES
 sprite_id sprite_ball;
+
+// Prototypes
+void draw_bounding_boxes(void);
+void draw_paddles(void);
+void rebound_ball(double, double);
+void check_balls(void);
+void setup(void);
+void help_screen(void);
+void process(void);
 
 // Draw bounding boxes
 void draw_bounding_boxes(void){
@@ -88,7 +97,7 @@ void draw_paddles(void){
 
 // Steps ball back and rebounds it
 void rebound_ball(double x_rebound, double y_rebound){
-    //sprite_back(sprite_ball);
+    sprite_back(sprite_ball);
     double dx = sprite_dx(sprite_ball);
     double dy = sprite_dy(sprite_ball);
     sprite_turn_to(sprite_ball, dx*x_rebound, dy*y_rebound);
@@ -112,12 +121,16 @@ void check_balls(void){
     // right paddle (user controlled)
     // 1 unit wide
     if (sprite_x(sprite_ball) >= RIGHT_PADDLE_X && sprite_x(sprite_ball) < RIGHT_PADDLE_X + 1){
-        
+        // Add score, determine how it bounces later
+        if (sprite_y(sprite_ball) >= RIGHT_PADDLE_Y && sprite_y(sprite_ball) <= RIGHT_PADDLE_Y + PADDLE_HEIGHT){
+            gameState.score += 1;
+        }
+
         // If it hits the top paddle
         if (sprite_y(sprite_ball) >= RIGHT_PADDLE_Y && sprite_y(sprite_ball) < RIGHT_PADDLE_Y + 1){
             // Moving downwards
             if (sprite_dy(sprite_ball) > 0){
-                // If distance between paddle and top wall is greater than 
+                // If distance between paddle and top wall is greater than
                 // height of ball, bounce off horizontally
                 if (RIGHT_PADDLE_Y-TOP_WALL > 1){
                     rebound_ball(1.0, -1.0);
@@ -131,7 +144,7 @@ void check_balls(void){
                 rebound_ball(-1.0, 1.0);
             }
         }
-        
+
         // Hits body
         else if (sprite_y(sprite_ball) >= RIGHT_PADDLE_Y+1 && sprite_y(sprite_ball) <= RIGHT_PADDLE_Y + PADDLE_HEIGHT - 1){
             rebound_ball(-1.0, 1.0);
@@ -155,10 +168,38 @@ void check_balls(void){
             }
         }
     }
+
+    // Check if ball is out of bounds
+    if (sprite_x(sprite_ball) > RIGHT_WALL || sprite_x(sprite_ball) < LEFT_WALL){
+        gameState.lives -= 1;
+
+        if (gameState.lives <= 0){
+            game_over = true;
+        }
+    }
+}
+
+// Countdown for ball
+void countdown(void){
+    for (int i = 3; i > 0; i--){
+        char b = i + '0'; // convert int to char
+
+        // Draw char
+        draw_char(SCREEN_WIDTH/2, SCREEN_HEIGHT/2-5, b);
+        show_screen();
+        timer_pause(300);
+    }
+    clear_screen();
+    draw_string(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2-5, "!@-- Game Starto --@!");
+    show_screen();
+    timer_pause(1000);
 }
 
 // Setup our variables and sprites
 void setup(void) {
+    // Game over
+    game_over = false;
+
     // Screen dimensions brah
     SCREEN_WIDTH = screen_width()-1;
     SCREEN_HEIGHT = screen_height()-1;
@@ -186,8 +227,7 @@ void setup(void) {
 
     // Our sprite
     sprite_ball = sprite_create(SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 1, 1, ball_img);
-    sprite_turn_to(sprite_ball, 0.3, 0.3);
-
+    sprite_turn_to(sprite_ball, 0.3, 0.3);    
 }
 
 // Updates ball position
@@ -201,6 +241,28 @@ void update_ball(){
 
     // Draw ball
     sprite_draw(sprite_ball);
+}
+
+// Help screen!!!
+void help_screen(void){
+    // Clears any buffer @ screen
+    clear_screen();
+
+    // Draw help text
+    // magic numbers!!!
+    // jks just minusing length of string to center them
+    draw_string(SCREEN_WIDTH/2-21, SCREEN_HEIGHT/2-5, "Kendrick Tan; n9701583; CAB202; 2016 Sem 2");
+    draw_string(SCREEN_WIDTH/2-9, SCREEN_HEIGHT/2-3, "-- Genetic Pong --");
+    draw_string(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2, "'l' to change levels");
+    draw_string(SCREEN_WIDTH/2-6, SCREEN_HEIGHT/2+1, "'r' to reset");
+    draw_string(SCREEN_WIDTH/2-12, SCREEN_HEIGHT/2+2, "'h' to display help text");
+    draw_string(SCREEN_WIDTH/2-5, SCREEN_HEIGHT/2+4, "-- Rules --");
+    draw_string(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2+6, "'w' to move paddle up");
+    draw_string(SCREEN_WIDTH/2-11, SCREEN_HEIGHT/2+7, "'s' to move paddle down");
+
+    show_screen();
+    wait_char();
+    clear_screen();
 }
 
 // Gets user input
@@ -237,6 +299,11 @@ void get_inputs(void){
         setup();
     }
 
+    // Help
+    else if (key == 'h'){
+        help_screen();
+    }
+
 }
 
 // Play one turn of game.
@@ -270,32 +337,41 @@ int main(void) {
     auto_save_screen(true);
 #endif
 
-    setup();
-    show_screen();
+    do{
+        setup();
+        help_screen();    
 
-    while ( !game_over ) {
-        process();
+        // Countdown mofo!!
+        countdown();
+        while ( !game_over ) {
+            process();
 
-        if ( update_screen ) {
-            show_screen();
-        }
+            if ( update_screen ) {
+                show_screen();
+            }
 
-        timer_pause(DELAY);
+            timer_pause(DELAY);
 
-        // Check for time.
-        // #yolo
-        gameState.time_ms += 10;
+            // Check for time.
+            // #yolo
+            gameState.time_ms += 10;
 
-        if (gameState.time_ms >= 1000){
-            gameState.time_s += 1;
-            gameState.time_ms = 0;
-        }
+            if (gameState.time_ms >= 1000){
+                gameState.time_s += 1;
+                gameState.time_ms = 0;
+            }
 
-        if (gameState.time_s >= 60){
-            gameState.time_m += 1;
-            gameState.time_s = 0;
-        }
-    }
+            if (gameState.time_s >= 60){
+                gameState.time_m += 1;
+                gameState.time_s = 0;
+            }
+        }        
+
+        clear_screen();
+
+        draw_string(SCREEN_WIDTH/2-14, SCREEN_HEIGHT/2, "Game over, play again? (y/n)");
+        show_screen();
+    }while(wait_char() == 'y');
 
     cleanup();
 
