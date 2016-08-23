@@ -42,6 +42,19 @@ void check_balls(void);
 void setup(void);
 void help_screen(void);
 void process(void);
+void reset_game_states(void);
+void countdown(void);
+void check_paddle(int, int);
+
+// Reset game states
+void reset_game_states(void){
+    gameState.level = 1;
+    gameState.score = 0;
+    gameState.lives = 10;
+    gameState.time_ms = 0;
+    gameState.time_s = 0;
+    gameState.time_m = 0;
+}
 
 // Draw bounding boxes
 void draw_bounding_boxes(void){
@@ -86,7 +99,7 @@ void draw_bounding_boxes(void){
 // Draw our pong paddles
 void draw_paddles(void){
     // Draw left paddle
-    // Don't need it on handball level
+    // Don't need it on handball level (level 1)
     if (gameState.level > 1){
         draw_line(LEFT_PADDLE_X, LEFT_PADDLE_Y, LEFT_PADDLE_X, LEFT_PADDLE_Y+PADDLE_HEIGHT, paddle_img);
     }
@@ -103,36 +116,24 @@ void rebound_ball(double x_rebound, double y_rebound){
     sprite_turn_to(sprite_ball, dx*x_rebound, dy*y_rebound);
 }
 
-void check_balls(void){
-    // If balls are beyond bounds @ top/bottom
-    // re bounce it
-    if (sprite_y(sprite_ball) >= BOTTOM_WALL || sprite_y(sprite_ball) <= TOP_WALL){
-        rebound_ball(1.0, -1.0);
-    }
-
-    // Left wall
-    if (gameState.level == 1 || TRAIN_AI){
-        if (sprite_x(sprite_ball) <= LEFT_WALL){// || sprite_x(sprite_ball) >= RIGHT_WALL){
-            rebound_ball(-1.0, 1.0);
-        }
-    }
-
+// Check if ball collides with paddle
+void check_paddle(int paddle_x, int paddle_y){
     // Check if it hits the
     // right paddle (user controlled)
     // 1 unit wide
-    if (sprite_x(sprite_ball) >= RIGHT_PADDLE_X && sprite_x(sprite_ball) < RIGHT_PADDLE_X + 1){
+    if (sprite_x(sprite_ball) >= paddle_x && sprite_x(sprite_ball) < paddle_x + 1){
         // Add score, determine how it bounces later
-        if (sprite_y(sprite_ball) >= RIGHT_PADDLE_Y && sprite_y(sprite_ball) <= RIGHT_PADDLE_Y + PADDLE_HEIGHT){
+        if (sprite_y(sprite_ball) >= paddle_y && sprite_y(sprite_ball) <= paddle_y + PADDLE_HEIGHT){
             gameState.score += 1;
         }
 
         // If it hits the top paddle
-        if (sprite_y(sprite_ball) >= RIGHT_PADDLE_Y && sprite_y(sprite_ball) < RIGHT_PADDLE_Y + 1){
+        if (sprite_y(sprite_ball) >= paddle_y && sprite_y(sprite_ball) < paddle_y + 1){
             // Moving downwards
             if (sprite_dy(sprite_ball) > 0){
                 // If distance between paddle and top wall is greater than
                 // height of ball, bounce off horizontally
-                if (RIGHT_PADDLE_Y-TOP_WALL > 1){
+                if (paddle_y-TOP_WALL > 1){
                     rebound_ball(1.0, -1.0);
                     gameState.score = 42;
                 }
@@ -146,17 +147,17 @@ void check_balls(void){
         }
 
         // Hits body
-        else if (sprite_y(sprite_ball) >= RIGHT_PADDLE_Y+1 && sprite_y(sprite_ball) <= RIGHT_PADDLE_Y + PADDLE_HEIGHT - 1){
+        else if (sprite_y(sprite_ball) >= paddle_y+1 && sprite_y(sprite_ball) <= paddle_y + PADDLE_HEIGHT - 1){
             rebound_ball(-1.0, 1.0);
         }
 
         // Hits bottom paddle
-        else if (sprite_y(sprite_ball) > RIGHT_PADDLE_Y + PADDLE_HEIGHT - 1 && sprite_y(sprite_ball) <= RIGHT_PADDLE_Y + PADDLE_HEIGHT){
+        else if (sprite_y(sprite_ball) > paddle_y + PADDLE_HEIGHT - 1 && sprite_y(sprite_ball) <= paddle_y + PADDLE_HEIGHT){
             // Moving Upwards
             if (sprite_dy(sprite_ball) < 0){
                 // If distance between paddle and bottom wall is greater than
                 // height of ball, bounce off horizontally
-                if (BOTTOM_WALL - (RIGHT_PADDLE_Y+PADDLE_HEIGHT) > 1){
+                if (BOTTOM_WALL - (paddle_y+PADDLE_HEIGHT) > 1){
                     rebound_ball(1.0, -1.0);
                 }
                 else{
@@ -168,14 +169,62 @@ void check_balls(void){
             }
         }
     }
+}
+
+// Basic AI for left paddle
+void update_base_ai(void){
+    // If ball is higher than paddle
+    // Try to center it
+    if (sprite_y(sprite_ball) < LEFT_PADDLE_Y + 3){
+        if (LEFT_PADDLE_Y > 3){
+            LEFT_PADDLE_Y -= 1;
+        }
+    }
+    else if (sprite_y(sprite_ball) > LEFT_PADDLE_Y + 3){
+        if (LEFT_PADDLE_Y + PADDLE_HEIGHT < SCREEN_HEIGHT-1){
+            LEFT_PADDLE_Y += 1;
+        }
+    }
+}
+
+void check_balls(void){
+    // If balls are beyond bounds @ top/bottom
+    // re bounce it
+    if (sprite_y(sprite_ball) >= BOTTOM_WALL || sprite_y(sprite_ball) <= TOP_WALL){
+        rebound_ball(1.0, -1.0);
+    }
+
+    // Left wall only bounce @ level 1
+    if (gameState.level == 1 || TRAIN_AI){
+        if (sprite_x(sprite_ball) <= LEFT_WALL){// || sprite_x(sprite_ball) >= RIGHT_WALL){
+            rebound_ball(-1.0, 1.0);
+        }
+    }
+
+    // Check if ball smashed with paddle
+    check_paddle(RIGHT_PADDLE_X, RIGHT_PADDLE_Y);
+
+    // Left Paddle only exists at level 1
+    if (gameState.level > 1){
+        check_paddle(LEFT_PADDLE_X-1, LEFT_PADDLE_Y);
+
+        // Update AI after collision checking
+        update_base_ai();
+    }
 
     // Check if ball is out of bounds
     if (sprite_x(sprite_ball) > RIGHT_WALL || sprite_x(sprite_ball) < LEFT_WALL){
-        gameState.lives -= 1;
+        setup(); // reset ball position        
+        clear_screen();
+        show_screen();
+        gameState.lives -= 1;                
 
         if (gameState.lives <= 0){
             game_over = true;
         }
+        else{
+            countdown();// countdown ball
+        }    
     }
 }
 
@@ -189,7 +238,7 @@ void countdown(void){
         show_screen();
         timer_pause(300);
     }
-    clear_screen();
+    //clear_screen();
     draw_string(SCREEN_WIDTH/2-10, SCREEN_HEIGHT/2-5, "!@-- Game Starto --@!");
     show_screen();
     timer_pause(1000);
@@ -296,7 +345,8 @@ void get_inputs(void){
 
     // Reset
     else if (key =='r'){
-        setup();
+        setup();   
+        reset_game_states();             
     }
 
     // Help
