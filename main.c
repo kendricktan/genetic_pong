@@ -17,6 +17,13 @@ char edge_img = '*';
 char paddle_img = '|';
 char ball_img[] = "O";
 
+char black_hole_img[] = 
+/**/          "\\  |  /"
+/**/          " \\ | / "
+/**/          "--   --"
+/**/          " / | \\ "
+/**/          "/  |  \\";
+
 // GAME STATES
 bool game_over;
 bool update_screen = true;
@@ -33,6 +40,7 @@ int RIGHT_PADDLE_X;
 
 // SPRITES
 sprite_id sprite_ball;
+sprite_id sprite_black_hole;
 
 // Prototypes
 void draw_bounding_boxes(void);
@@ -45,6 +53,13 @@ void process(void);
 void reset_game_states(void);
 void countdown(void);
 void check_paddle(int, int);
+
+// Generate random number
+double fRand(double fMin, double fMax)
+{
+    double f = (double)rand() / RAND_MAX;
+    return fMin + f * (fMax - fMin);
+}
 
 // Reset game states
 void reset_game_states(void){
@@ -188,6 +203,30 @@ void update_base_ai(void){
 }
 
 void check_balls(void){
+    // Accelerate ball to black hole
+    if (gameState.level == 3){
+        double rebound_x = 0.002, rebound_y = 0.0002;
+
+        // Sprite ball is accelerating to left
+        if (sprite_x(sprite_ball) > sprite_x(sprite_black_hole)){
+            rebound_x = -rebound_x;
+        }
+        // Accelerating down
+        if (sprite_y(sprite_ball) > sprite_y(sprite_black_hole)){
+            rebound_y = -rebound_y;
+        }
+        
+        double dx = sprite_dx(sprite_ball);
+        double dy = sprite_dy(sprite_ball);
+
+        // Threshold dx 
+        // > 0.1 or < -0.1
+        // it will be the minimum velocity speed it can reach
+        if (((dx > 0) && dx+rebound_x > 0.1) || ((dx < 0) && (dx+rebound_x < -0.1))){        
+            sprite_turn_to(sprite_ball, dx+rebound_x, dy+rebound_y);
+        }
+    } 
+
     // If balls are beyond bounds @ top/bottom
     // re bounce it
     if (sprite_y(sprite_ball) >= BOTTOM_WALL || sprite_y(sprite_ball) <= TOP_WALL){
@@ -276,20 +315,26 @@ void setup(void) {
 
     // Our sprite
     sprite_ball = sprite_create(SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 1, 1, ball_img);
-    sprite_turn_to(sprite_ball, 0.3, 0.3);    
+
+    double dx = fRand(0.2, 0.3);
+    double dy = fRand(0.2, 0.3);
+    
+    sprite_turn_to(sprite_ball, dx, dy); // random velocity
+
+    sprite_black_hole = sprite_create(SCREEN_WIDTH/2-3, SCREEN_HEIGHT/2-1, 7, 5, black_hole_img);    
 }
 
 // Updates ball position
 // and draws it
-void update_ball(){
+void update_ball(){    
     // Update ball position
-    sprite_step(sprite_ball);
+    sprite_step(sprite_ball);     
 
     // Check for collision
-    check_balls();
+    check_balls();    
 
     // Draw ball
-    sprite_draw(sprite_ball);
+    sprite_draw(sprite_ball);      
 }
 
 // Help screen!!!
@@ -366,6 +411,11 @@ void process(void) {
 
     // Draw them sprites
     draw_paddles();
+
+    // Only draw black hole if level is 3
+    if (gameState.level == 3){
+        sprite_draw(sprite_black_hole);
+    }
 
     // Draw them balls
     update_ball();
