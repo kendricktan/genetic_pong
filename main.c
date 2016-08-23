@@ -8,6 +8,9 @@
 #define DELAY 10 /* milliseconds */
 #define PADDLE_LENGTH 6
 
+// Black hole counter
+int bh_time_elapsed_ms = 0;
+
 // SCREEN BOUNDARIES
 int SCREEN_WIDTH, SCREEN_HEIGHT;
 int TOP_WALL, BOTTOM_WALL, LEFT_WALL, RIGHT_WALL; // Walls bounding the ball
@@ -69,6 +72,8 @@ void reset_game_states(void){
     gameState.time_ms = 0;
     gameState.time_s = 0;
     gameState.time_m = 0;
+
+    bh_time_elapsed_ms = 0;
 }
 
 // Draw bounding boxes
@@ -205,27 +210,34 @@ void update_base_ai(void){
 void check_balls(void){
     // Accelerate ball to black hole
     if (gameState.level == 3){
-        double rebound_x = 0.002, rebound_y = 0.0002;
+        bh_time_elapsed_ms += DELAY;
 
-        // Sprite ball is accelerating to left
-        if (sprite_x(sprite_ball) > sprite_x(sprite_black_hole)){
-            rebound_x = -rebound_x;
-        }
-        // Accelerating down
-        if (sprite_y(sprite_ball) > sprite_y(sprite_black_hole)){
-            rebound_y = -rebound_y;
-        }
-        
-        double dx = sprite_dx(sprite_ball);
-        double dy = sprite_dy(sprite_ball);
+        if (bh_time_elapsed_ms >= 5000){
+            double rebound_x = 0.002, rebound_y = 0.0002;
 
-        // Threshold dx 
-        // > 0.1 or < -0.1
-        // it will be the minimum velocity speed it can reach
-        if (((dx > 0) && dx+rebound_x > 0.1) || ((dx < 0) && (dx+rebound_x < -0.1))){        
-            sprite_turn_to(sprite_ball, dx+rebound_x, dy+rebound_y);
+            // Sprite ball is accelerating to left
+            if (sprite_x(sprite_ball) > sprite_x(sprite_black_hole)){
+                rebound_x = -rebound_x;
+            }
+            // Accelerating down
+            if (sprite_y(sprite_ball) > sprite_y(sprite_black_hole)){
+                rebound_y = -rebound_y;
+            }
+            
+            double dx = sprite_dx(sprite_ball);
+            double dy = sprite_dy(sprite_ball);
+
+            // Threshold dx 
+            // > 0.1 or < -0.1
+            // it will be the minimum velocity speed it can reach
+            if (((dx > 0) && dx+rebound_x > 0.1) || ((dx < 0) && (dx+rebound_x < -0.1))){        
+                sprite_turn_to(sprite_ball, dx+rebound_x, dy+rebound_y);
+            }
         }
-    } 
+    }
+    else if(gameState.level != 3){
+        bh_time_elapsed_ms = 0;
+    }
 
     // If balls are beyond bounds @ top/bottom
     // re bounce it
@@ -285,6 +297,9 @@ void countdown(void){
 
 // Setup our variables and sprites
 void setup(void) {
+    // Blachole thingy
+    bh_time_elapsed_ms = 0;
+
     // Game over
     game_over = false;
 
@@ -413,7 +428,7 @@ void process(void) {
     draw_paddles();
 
     // Only draw black hole if level is 3
-    if (gameState.level == 3){
+    if (gameState.level == 3 && bh_time_elapsed_ms >= 5000){
         sprite_draw(sprite_black_hole);
     }
 
