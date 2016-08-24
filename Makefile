@@ -4,7 +4,7 @@ all: $(TARGETS)
 
 LIBS=-lzdk -lncurses -lm
 DIRS=-I lib/ZDK -L lib/ZDK
-FILES=game_states.h
+FILES=
 FLAGS=-std=gnu99 -Wall -Werror -g
 
 clean:

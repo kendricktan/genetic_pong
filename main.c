@@ -1,12 +1,28 @@
 #include <stdlib.h>
 #include <math.h>
-#include "game_states.h"
 #include <cab202_graphics.h>
 #include <cab202_sprites.h>
 #include <cab202_timers.h>
 
 #define DELAY 10 /* milliseconds */
 #define PADDLE_LENGTH 6
+
+// Structs
+struct Rail{
+    int x;
+    int y;
+    bool on_screen;
+};
+
+// Game states
+typedef struct GameStates{
+    int level;
+    int score;
+    int lives;
+    int time_m;
+    int time_s;
+    int time_ms;
+} GameStates;
 
 // Black hole counter
 int bh_time_elapsed_ms = 0;
@@ -19,7 +35,7 @@ int TOP_WALL, BOTTOM_WALL, LEFT_WALL, RIGHT_WALL; // Walls bounding the ball
 char edge_img = '*';
 char paddle_img = '|';
 char ball_img[] = "O";
-
+char rail_img = '=';
 char black_hole_img[] = 
 /**/          "\\  |  /"
 /**/          " \\ | / "
@@ -45,6 +61,11 @@ int RIGHT_PADDLE_X;
 sprite_id sprite_ball;
 sprite_id sprite_black_hole;
 
+// RAILS
+int NUM_RAILS;
+struct Rail *rails;
+
+
 // Prototypes
 void draw_bounding_boxes(void);
 void draw_paddles(void);
@@ -56,12 +77,69 @@ void process(void);
 void reset_game_states(void);
 void countdown(void);
 void check_paddle(int, int);
+void initialize_rails(void);
+void draw_rails(void);
+void check_rails(void);
 
 // Generate random number
 double fRand(double fMin, double fMax)
 {
     double f = (double)rand() / RAND_MAX;
     return fMin + f * (fMax - fMin);
+}
+
+// Initializes rails
+void initialize_rails(void){
+    // I don't like memory leaks
+    free(rails);
+
+    // Allocate more memory
+    // * 2 because there is 2 lanes
+    rails = malloc(NUM_RAILS*2*sizeof(*rails));
+
+    int START_X = SCREEN_WIDTH/4;
+    int Y = SCREEN_HEIGHT/3;
+
+    // Top half
+    for (int i = 0; i < NUM_RAILS; i++){
+        rails[i].x = START_X+i;
+        rails[i].y = Y;
+        rails[i].on_screen = true;
+    }
+
+    // Bottom half
+    for (int i = NUM_RAILS; i < NUM_RAILS*2; i++){
+        rails[i].x = START_X+i-NUM_RAILS;
+        rails[i].y = Y*2;
+        rails[i].on_screen = true;
+    }
+}
+
+// Draw muh rails
+void draw_rails(void){
+    if(gameState.level == 4){
+        for (int i = 0; i < NUM_RAILS*2; i++){
+            if (rails[i].on_screen){
+                draw_char(rails[i].x, rails[i].y, rail_img);
+            }
+        }
+    }
+}
+
+// Check collision with rails
+void check_rails(void){
+    if(gameState.level == 4){
+        for (int i = 0; i < NUM_RAILS*2; i++){
+            if (rails[i].on_screen){
+                if(sprite_x(sprite_ball) >= rails[i].x-1 && sprite_x(sprite_ball) <= rails[i].x){ 
+                    if(sprite_y(sprite_ball) >= rails[i].y-1 && sprite_y(sprite_ball) <= rails[i].y){
+                        rebound_ball(1.0, -1.0);
+                        rails[i].on_screen = false;
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Reset game states
@@ -142,10 +220,6 @@ void check_paddle(int paddle_x, int paddle_y){
     // right paddle (user controlled)
     // 1 unit wide
     if (sprite_x(sprite_ball) >= paddle_x && sprite_x(sprite_ball) < paddle_x + 1){
-        // Add score, determine how it bounces later
-        if (sprite_y(sprite_ball) >= paddle_y && sprite_y(sprite_ball) <= paddle_y + PADDLE_HEIGHT){
-            gameState.score += 1;
-        }
 
         // If it hits the top paddle
         if (sprite_y(sprite_ball) >= paddle_y && sprite_y(sprite_ball) < paddle_y + 1){
@@ -212,6 +286,7 @@ void check_balls(void){
     if (gameState.level == 3){
         bh_time_elapsed_ms += DELAY;
 
+        // 5 second delay bytch
         if (bh_time_elapsed_ms >= 5000){
             double rebound_x = 0.002, rebound_y = 0.0002;
 
@@ -252,6 +327,13 @@ void check_balls(void){
         }
     }
 
+    // update score
+    if (sprite_x(sprite_ball) >= RIGHT_PADDLE_X && sprite_x(sprite_ball) < RIGHT_PADDLE_X + 1){
+        // Add score, determine how it bounces later
+        if (sprite_y(sprite_ball) >= RIGHT_PADDLE_Y && sprite_y(sprite_ball) <= RIGHT_PADDLE_Y + PADDLE_HEIGHT){
+            gameState.score += 1;
+        }
+    }
     // Check if ball smashed with paddle
     check_paddle(RIGHT_PADDLE_X, RIGHT_PADDLE_Y);
 
@@ -312,6 +394,11 @@ void setup(void) {
     LEFT_WALL = 1;
     RIGHT_WALL = SCREEN_WIDTH-1;
 
+    // Rails (takes up half screen)
+    // +1/2 incase of odd number
+    NUM_RAILS = (SCREEN_WIDTH+1)/2;
+    initialize_rails();
+
     // Our paddle height brah
     if (SCREEN_HEIGHT > 21){
         PADDLE_HEIGHT = 7;
@@ -330,9 +417,17 @@ void setup(void) {
 
     // Our sprite
     sprite_ball = sprite_create(SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 1, 1, ball_img);
+    
+    double dx = fRand(0.15, 0.25);
+    double dy = fRand(0.15, 0.25);
 
-    double dx = fRand(0.2, 0.3);
-    double dy = fRand(0.2, 0.3);
+    // Arbitrary direction
+    if (rand() & 1){
+        dx = -dx;
+    }
+    if (rand() & 1){
+        dy = -dy;
+    }
     
     sprite_turn_to(sprite_ball, dx, dy); // random velocity
 
@@ -347,6 +442,7 @@ void update_ball(){
 
     // Check for collision
     check_balls();    
+    check_rails();
 
     // Draw ball
     sprite_draw(sprite_ball);      
@@ -426,6 +522,7 @@ void process(void) {
 
     // Draw them sprites
     draw_paddles();
+    draw_rails();
 
     // Only draw black hole if level is 3
     if (gameState.level == 3 && bh_time_elapsed_ms >= 5000){
@@ -441,7 +538,8 @@ void process(void) {
 
 // Clean up game
 void cleanup(void) {
-    // STATEMENTS
+    // No likey memory leaky
+    free(rails);
 }
 
 // Program entry point.
