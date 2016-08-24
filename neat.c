@@ -1,5 +1,6 @@
 // Inputs = distance between ball and paddle
 // Outputs up, or down
+#include <unistd.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -9,14 +10,15 @@
 #define INPUTS 1
 #define OUTPUTS 1
 
+#define MINFITNESS 5 // minimum must have scored at least 2 points in order to not be removed 
+#define MAXERROR 2.5 // maximum error before mutating that branch
+
 #define POOLSIZE 10
 #define MAXGENES 4
-#define GENERATIONS 25
+#define GENERATIONS 500
 
 #define MUTATIONRATE 0.25
 #define ELIMINATIONRATE 0.1
-
-#define TIMEOUT 0.2
 
 // Which genome are we currently on?
 int current_genome = 0;
@@ -26,13 +28,13 @@ struct Gene{
     double weight; // Whats the weighting on this particular gene?
     double result; // Whats the result?
 
-    struct Gene *into; // Which gene do we go into?
+    struct Gene *in; // Which gene do we go in via?
     struct Gene *out; // Which gene do we go out?    
 };
 
 struct Genome{
     struct Gene *genes;
-    int fitness;    
+    double fitness;    
 };
 
 struct Genome *genomes; // Our pool of genomes
@@ -45,8 +47,9 @@ double randBetween(double M, double N){
 // Generate a gene with a random weight
 struct Gene gen_gene(void){
     struct Gene gene;
-    gene.weight = randBetween(-1, 1);    
-    gene.into = malloc(sizeof(struct Gene*));
+    gene.result = 0;
+    gene.weight = randBetween(-5, 5);    
+    gene.in = malloc(sizeof(struct Gene*));
     gene.out = malloc(sizeof(struct Gene*));
     return gene;
 }
@@ -64,13 +67,56 @@ struct Genome gen_genome(void){
     return genome;
 }
 
+// Mates between two genome
+struct Genome mate(struct Genome genome1, struct Genome genome2){
+    struct Genome genome;    
+    genome.genes = malloc(MAXGENES*sizeof(struct Gene));
+    genome.fitness = 0;
+    for (int i = 0; i < MAXGENES; i++){
+        // Generate gene and then assign
+        genome.genes[i] = gen_gene();        
+
+        // LOL
+        if (rand() & 1){            
+            genome.genes[i].weight = genome1.genes[i].weight;            
+        }
+
+        else{
+            genome.genes[i].weight = genome2.genes[i].weight;
+        }            
+    }        
+    return genome;
+}
+
+// Mutates a genome
+void mutate(struct Genome *genome){
+    for (int i = 0; i < MAXGENES; i++){
+        int out = randBetween(0, MAXGENES-1);
+        int in = randBetween(0, MAXGENES-1);
+
+        // Can't have same in out
+        while(in == out){
+            in = randBetween(0, MAXGENES-1);
+        }
+
+
+        if (rand() & 1){
+            genome->genes[i].in = &genome->genes[in];
+        }
+
+        if (rand() & 1){
+            genome->genes[i].out = &genome->genes[out];
+        }
+    }
+}
+
 // Randomly point genes within a genome towards each other
 void randomize_genes(struct Genome *genome){
     for (int i = 0; i < MAXGENES; i++){
         int out = randBetween(0, MAXGENES-1);
         int in = randBetween(0, MAXGENES-1);
 
-        // Can't have some in out
+        // Can't have same in out
         while(in == out){
             in = randBetween(0, MAXGENES-1);
         }
@@ -108,29 +154,65 @@ void sort_genome_pool(void){
     }
 }
 
-// Debug
-void print_genome(){
-    for (int i = 0; i < POOLSIZE; i++){
-        for(int j = 0; j < MAXGENES; j++){            
-            double result = genomes[i].genes[j].weight * genomes[i].genes[j].readFrom->weight;
+// Gets our genome with top fitness 
+// and try and mutate between them 
+void evolve(void){
+    // Sort our genepool first
+    sort_genome_pool();
 
-            printf("%.2f\n",result);
+    int good_gene_index_max = 0;
+
+    for (int i = POOLSIZE-1; i >= 0; i--){
+        printf("fitness %d: %.2f\n", i, genomes[i].fitness);        
+        if(genomes[i].fitness < MAXERROR){                       
+            good_gene_index_max = i;            
         }
+    }        
+    
+    // Create new good genes
+    for (int i = 0; i < POOLSIZE; i++){
+        if(genomes[i].fitness > MAXERROR){        
+            int first = floor(randBetween(0.0, (double)good_gene_index_max));
+            int second = floor(randBetween(0.0, (double)good_gene_index_max));
+
+            genomes[i] = mate(genomes[first], genomes[second]);
+        }
+
+        if (randBetween(0, 1) < MUTATIONRATE){
+            mutate(&genomes[i]);
+        }        
     }
 }
 
-void print_genome_fitness(){
-    for (int i = 0; i < POOLSIZE; i++){
-        printf("%d\n", genomes[i].fitness);
+// Predict output stuff
+double predict(int genome_no, double input){
+    // Assume first gene has no in
+    genomes[genome_no].genes[0].out->result = genomes[genome_no].genes[0].weight * input;
+
+    for (int i = 1; i < MAXGENES; i++){      
+        struct Gene *cur_gene = &genomes[genome_no].genes[i]; 
+        
+        cur_gene->result = cur_gene->in->weight*cur_gene->in->result;
+        cur_gene->out->result = cur_gene->weight*cur_gene->result;
     }
+
+    // Assume last gene is output
+    return genomes[genome_no].genes[MAXGENES-1].result;
+}
+
+// Print smallest error
+void print_genome_smallest_error(){
+    double error = 0;
+    for (int i = 0; i < POOLSIZE; i++){
+        if (genomes[i].fitness < error){
+            error = genomes[i].fitness;
+        }
+    }
+    printf("%.2f\n", error);
 }
 
 double sigmoid(double x){
     return 1/(1+exp(x));
-}
-
-double predict(int genome_no, int input){
-
 }
 
 int main(){
@@ -139,7 +221,17 @@ int main(){
 
     gen_genome_pool();
 
-    print_genome_fitness();
+    // test, try and get number to be as close as to 8, input = 20
+    double i_input = 32767.32;
+    for (int j = 0; j < GENERATIONS; j++){
+        for(int i = 0; i < POOLSIZE; i ++){
+            genomes[i].fitness = abs(8.0-predict(i, i_input));
+        }
+        evolve();
+        printf("Evolution %d, smallest error: ", j);
+        print_genome_smallest_error();
+        sleep(1);
+    }
 
     free(genomes);
     return 0;
