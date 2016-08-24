@@ -9,5 +9,8 @@ make
 ./bin/genetic_pong
 ```
 
+# References
+- [Evolving Neural Networks through Augmenting Topologies](!http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf)
+
 ## In progress
 - NEAT algorithm to play pong

@@ -4,7 +4,7 @@ all: $(TARGETS)
 
 LIBS=-lzdk -lncurses -lm
 DIRS=-I lib/ZDK -L lib/ZDK
-FILES=
+FILES=neat.c
 FLAGS=-std=gnu99 -Wall -Werror -g
 
 clean:
@@ -17,3 +17,6 @@ rebuild: clean all
 
 genetic_pong:
 	gcc $(FLAGS) $(FILES) main.c -o bin/genetic_pong $(DIRS) $(LIBS)
+
+neat:
+	gcc $(FLAGS) neat.c -o bin/neat $(DIRS) $(LIBS)
