@@ -11,7 +11,6 @@
 #define OUTPUTS 1
 
 #define MINFITNESS 5 // minimum must have scored at least 2 points in order to not be removed 
-#define MAXERROR 2.5 // maximum error before mutating that branch
 
 #define POOLSIZE 10
 #define MAXGENES 4
@@ -19,6 +18,7 @@
 
 #define MUTATIONRATE 0.25
 #define ELIMINATIONRATE 0.1
+#define MATERATE 0.2
 
 // Which genome are we currently on?
 int current_genome = 0;
@@ -113,7 +113,7 @@ void mutate(struct Genome *genome){
 // Randomly point genes within a genome towards each other
 void randomize_genes(struct Genome *genome){
     for (int i = 0; i < MAXGENES; i++){
-        int out = randBetween(0, MAXGENES-1);
+        int out = randBetween(0, MAXGENES);
         int in = randBetween(0, MAXGENES-1);
 
         // Can't have same in out
@@ -160,22 +160,17 @@ void evolve(void){
     // Sort our genepool first
     sort_genome_pool();
 
-    int good_gene_index_max = 0;
-
-    for (int i = POOLSIZE-1; i >= 0; i--){
-        printf("fitness %d: %.2f\n", i, genomes[i].fitness);        
-        if(genomes[i].fitness < MAXERROR){                       
-            good_gene_index_max = i;            
-        }
-    }        
-    
     // Create new good genes
     for (int i = 0; i < POOLSIZE; i++){
-        if(genomes[i].fitness > MAXERROR){        
-            int first = floor(randBetween(0.0, (double)good_gene_index_max));
-            int second = floor(randBetween(0.0, (double)good_gene_index_max));
+        printf("fitness %d: %.2f\n", i, genomes[i].fitness);        
+        if(genomes[i].fitness < MINFITNESS){        
 
-            genomes[i] = mate(genomes[first], genomes[second]);
+            if (randBetween(0.0, 1.0) < MATERATE){
+                genomes[i] = mate(genomes[0], genomes[1]);
+            }
+            else{
+                genomes[i] = gen_genome();
+            }
         }
 
         if (randBetween(0, 1) < MUTATIONRATE){
@@ -200,15 +195,15 @@ double predict(int genome_no, double input){
     return genomes[genome_no].genes[MAXGENES-1].result;
 }
 
-// Print smallest error
-void print_genome_smallest_error(){
-    double error = 0;
+// Print fittest genome 
+void print_genome_fittest(void){
+    double fittest = 0;
     for (int i = 0; i < POOLSIZE; i++){
-        if (genomes[i].fitness < error){
-            error = genomes[i].fitness;
+        if (genomes[i].fitness > fittest){
+            fittest = genomes[i].fitness;
         }
     }
-    printf("%.2f\n", error);
+    printf("%.2f\n", fittest);
 }
 
 double sigmoid(double x){
@@ -221,15 +216,15 @@ int main(){
 
     gen_genome_pool();
 
-    // test, try and get number to be as close as to 8, input = 20
+    // test, try and get number to as big as possible 
     double i_input = 32767.32;
     for (int j = 0; j < GENERATIONS; j++){
         for(int i = 0; i < POOLSIZE; i ++){
-            genomes[i].fitness = abs(8.0-predict(i, i_input));
+            genomes[i].fitness = predict(i, i_input);
         }
         evolve();
-        printf("Evolution %d, smallest error: ", j);
-        print_genome_smallest_error();
+        printf("Evolution %d, fittest: ", j);
+        print_genome_fittest();
         sleep(1);
     }
 
