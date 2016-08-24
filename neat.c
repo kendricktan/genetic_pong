@@ -1,4 +1,4 @@
-// Inputs distance between ball and paddle
+// Inputs = distance between ball and paddle
 // Outputs up, or down
 #include <math.h>
 #include <stdlib.h>
@@ -10,8 +10,8 @@
 #define OUTPUTS 1
 
 #define POOLSIZE 10
-#define MAXGENES 12
-#define GENERATIONS 100
+#define MAXGENES 4
+#define GENERATIONS 25
 
 #define MUTATIONRATE 0.25
 #define ELIMINATIONRATE 0.1
@@ -24,9 +24,10 @@ int current_genome = 0;
 // Genetics!
 struct Gene{    
     double weight; // Whats the weighting on this particular gene?
-    double result; // Whats the result? (this->result = readFrom->result*this->weight)
+    double result; // Whats the result?
 
-    struct Gene *readFrom; // Which gene do we read from?    
+    struct Gene *into; // Which gene do we go into?
+    struct Gene *out; // Which gene do we go out?    
 };
 
 struct Genome{
@@ -45,7 +46,8 @@ double randBetween(double M, double N){
 struct Gene gen_gene(void){
     struct Gene gene;
     gene.weight = randBetween(-1, 1);    
-    gene.readFrom = malloc(sizeof(struct Gene*));
+    gene.into = malloc(sizeof(struct Gene*));
+    gene.out = malloc(sizeof(struct Gene*));
     return gene;
 }
 
@@ -65,8 +67,16 @@ struct Genome gen_genome(void){
 // Randomly point genes within a genome towards each other
 void randomize_genes(struct Genome *genome){
     for (int i = 0; i < MAXGENES; i++){
-        int n = randBetween(0, MAXGENES-1);
-        genome->genes[i].readFrom = &genome->genes[n];
+        int out = randBetween(0, MAXGENES-1);
+        int in = randBetween(0, MAXGENES-1);
+
+        // Can't have some in out
+        while(in == out){
+            in = randBetween(0, MAXGENES-1);
+        }
+
+        genome->genes[i].out = &genome->genes[out];
+        genome->genes[i].in = &genome->genes[in];
     }
 }
 
@@ -84,7 +94,19 @@ void gen_genome_pool(void){
     }
 }
 
-// Sort pool by fitness function
+// Sort pool by fitness
+// fucking bubble sort #yolo
+void sort_genome_pool(void){
+    for (int i = 0; i < POOLSIZE; i++){
+        for (int j = 0; j < POOLSIZE; j++){
+            if (genomes[i].fitness > genomes[j].fitness){
+                struct Genome temp = genomes[j];
+                genomes[j] = genomes[i];
+                genomes[i] = temp;
+            }
+        }
+    }
+}
 
 // Debug
 void print_genome(){
@@ -97,8 +119,18 @@ void print_genome(){
     }
 }
 
+void print_genome_fitness(){
+    for (int i = 0; i < POOLSIZE; i++){
+        printf("%d\n", genomes[i].fitness);
+    }
+}
+
 double sigmoid(double x){
     return 1/(1+exp(x));
+}
+
+double predict(int genome_no, int input){
+
 }
 
 int main(){
@@ -107,6 +139,8 @@ int main(){
 
     gen_genome_pool();
 
-    print_genome();
+    print_genome_fitness();
+
+    free(genomes);
     return 0;
 }
