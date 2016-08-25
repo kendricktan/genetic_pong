@@ -210,7 +210,8 @@ double sigmoid(double x){
     return 1/(1+exp(x));
 }
 
-int main(){
+int iimain(){
+
     // More random numbers!
     srand(time(NULL));
 

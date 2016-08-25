@@ -128,18 +128,23 @@ void draw_rails(void){
 
 // Check collision with rails
 void check_rails(void){
+	bool rebound = false;
     if(gameState.level == 4){
         for (int i = 0; i < NUM_RAILS*2; i++){
             if (rails[i].on_screen){
-                if(sprite_x(sprite_ball) >= rails[i].x-1 && sprite_x(sprite_ball) <= rails[i].x){ 
+                if(sprite_x(sprite_ball) >= rails[i].x-2 && sprite_x(sprite_ball) <= rails[i].x+1){ 
                     if(sprite_y(sprite_ball) >= rails[i].y-1 && sprite_y(sprite_ball) <= rails[i].y){
-                        rebound_ball(1.0, -1.0);
                         rails[i].on_screen = false;
+						rebound = true;
                     }
                 }
             }
         }
     }
+
+	if(rebound){
+		rebound_ball(1.0, -1.0);
+	}
 }
 
 // Reset game states
